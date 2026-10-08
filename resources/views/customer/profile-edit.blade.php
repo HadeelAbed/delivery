@@ -59,7 +59,9 @@
 
             <div class="bg-white p-6 rounded-lg shadow mb-6">
                 <h3 class="font-semibold mb-4">{{ __('customer.profile') }} {{ __('customer.edit_profile') }}</h3>
-                <form action="/customer/profile" method="PUT" class="space-y-4">
+                <form action="/customer/profile" method="POST" class="space-y-4">
+                    @csrf
+                    @method('PUT')
                     <div>
                         <label class="block text-sm font-medium mb-2">{{ __('customer.name') }}</label>
                         <input type="text" name="name" value="{{ $user->name }}" required class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-accent">
