@@ -90,7 +90,7 @@ class SyncService
 
     /**
      * Mirror the order transition onto the driver's existing deliveries row, matching
-     * the web DeliveryController semantics (`pickup`/`deliver`). Never creates a row — 
+     * the web DeliveryController semantics (`pickup`/`deliver`). Never creates a row —
      * new assignments stay strictly with AssignOrderJob.
      */
     private function mirrorDeliveryState(Order $order, string $type): void

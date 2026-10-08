@@ -5,15 +5,13 @@ namespace App\Services;
 use App\Models\Order;
 use App\Models\Rating;
 use App\Models\User;
-use Illuminate\Support\Facades\Gate;
-use Illuminate\Validation\Rule;
 
 class RatingService
 {
     /**
      * Check if a user can rate an order.
      *
-     * @return  array{canRate: bool, reason?: string}
+     * @return array{canRate: bool, reason?: string}
      */
     public static function canRate(Order $order, User $customer): array
     {
@@ -38,22 +36,22 @@ class RatingService
     /**
      * Submit a rating for an order.
      *
-     * @return  array{success: bool, rating?: Rating, errors?: array, message: string}
+     * @return array{success: bool, rating?: Rating, errors?: array, message: string}
      */
     public static function submitRating(array $data, User $customer): array
     {
         // Extract and validate
         $validated = \Validator::make($data, [
-            'order_id'      => ['required', 'exists:orders,id'],
+            'order_id' => ['required', 'exists:orders,id'],
             'merchant_score' => ['required', 'integer', 'between:1,5'],
-            'driver_score'   => ['required', 'integer', 'between:1,5'],
-            'comment'        => ['nullable', 'string', 'max:500'],
+            'driver_score' => ['required', 'integer', 'between:1,5'],
+            'comment' => ['nullable', 'string', 'max:500'],
         ]);
 
         if ($validated->fails()) {
             return [
                 'success' => false,
-                'errors'  => $validated->errors()->toArray(),
+                'errors' => $validated->errors()->toArray(),
                 'message' => 'Validation failed',
             ];
         }
@@ -66,24 +64,24 @@ class RatingService
         if (! $canRate['canRate']) {
             return [
                 'success' => false,
-                'errors'  => [['message' => $canRate['reason']]],
+                'errors' => [['message' => $canRate['reason']]],
                 'message' => 'Cannot rate this order',
             ];
         }
 
         // Create the rating
         $rating = Rating::create([
-            'order_id'       => $order->id,
-            'customer_id'    => $customer->id,
+            'order_id' => $order->id,
+            'customer_id' => $customer->id,
             'merchant_score' => $data['merchant_score'],
-            'driver_score'   => $data['driver_score'],
-            'comment'        => $data['comment'] ?? null,
+            'driver_score' => $data['driver_score'],
+            'comment' => $data['comment'] ?? null,
         ]);
 
         return [
             'success' => true,
-            'rating'    => $rating,
-            'message'   => 'Rating submitted successfully',
+            'rating' => $rating,
+            'message' => 'Rating submitted successfully',
         ];
     }
 }

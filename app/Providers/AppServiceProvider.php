@@ -33,7 +33,7 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         RateLimiter::for('login', function (Request $request) {
-            return Limit::perMinute(5)->by($request->input('email').'|'.$request->ip());
+            return Limit::perMinute((int) config('auth.login_rate_limit'))->by($request->input('email').'|'.$request->ip());
         });
 
         Gate::define('admin.access', function ($user) {

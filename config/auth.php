@@ -22,6 +22,18 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Login Rate Limiting
+    |--------------------------------------------------------------------------
+    |
+    | Maximum login attempts allowed per minute for each email + IP pair
+    | before further attempts are rejected with HTTP 429.
+    |
+    */
+
+    'login_rate_limit' => (int) env('LOGIN_RATE_LIMIT', 5),
+
+    /*
+    |--------------------------------------------------------------------------
     | Authentication Guards
     |--------------------------------------------------------------------------
     |
