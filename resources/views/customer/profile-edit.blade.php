@@ -76,14 +76,20 @@
                 </form>
             </div>
 
+            <div class="bg-white p-6 rounded-lg shadow mb-6">
+                <h3 class="font-semibold mb-4">{{ __('customer.deactivate_account') }}</h3>
+                <p class="text-sm text-gray-600 mb-3">{{ __('customer.deactivate_confirm') }}</p>
+                <form action="{{ route('account.deactivate') }}" method="POST">
+                    @csrf
+                    <button type="submit" class="btn btn-primary w-full" onclick="return confirm('{{ __('customer.deactivate_confirm') }}')">{{ __('customer.deactivate_account') }}</button>
+                </form>
+            </div>
+
             @if(session('status'))
                 <div class="bg-green-100 text-green-800 p-3 rounded mb-4">{{ session('status') }}</div>
             @endif
         @endif
 
-        @section('content')
-            @show
-        @endsection
     </div>
 </body>
 </html>

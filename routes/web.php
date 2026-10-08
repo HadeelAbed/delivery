@@ -5,6 +5,7 @@ use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\OrderController as AdminOrderController;
 use App\Http\Controllers\Admin\ReportController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
+use App\Http\Controllers\Auth\DeactivateController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\LogoutController;
 use App\Http\Controllers\Auth\RegisterController;
@@ -37,6 +38,8 @@ Route::middleware('guest')->group(function () {
 });
 
 Route::post('/logout', [LogoutController::class, 'store'])->middleware('auth')->name('logout');
+
+Route::post('/account/deactivate', [DeactivateController::class, 'store'])->middleware('auth')->name('account.deactivate');
 
 Route::middleware(['auth', 'role:customer'])->group(function () {
     Route::get('/customer', [HomeController::class, 'index'])->name('customer.home');

@@ -28,5 +28,7 @@ return [
     'submit_rating' => 'إرسال التصنيف',
     'merchant_score' => 'درجة التاجر',
     'driver_score' => 'درجة السائق',
+    'deactivate_account' => 'تعطيل الحساب',
+    'deactivate_confirm' => 'هل أنت متأكد؟ سيؤدي تعطيل حسابك إلى تسجيل خروجك ومنع تسجيل الدخول.',
 
 ];

@@ -28,5 +28,7 @@ return [
     'submit_rating' => 'Submit Rating',
     'merchant_score' => 'Merchant score',
     'driver_score' => 'Driver score',
+    'deactivate_account' => 'Deactivate Account',
+    'deactivate_confirm' => 'Are you sure? Deactivating your account will sign you out and block login.',
 
 ];
