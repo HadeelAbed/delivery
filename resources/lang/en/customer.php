@@ -28,7 +28,7 @@ return [
     'submit_rating' => 'Submit Rating',
     'merchant_score' => 'Merchant score',
     'driver_score' => 'Driver score',
-    'deactivate_account' => 'Deactivate Account',
-    'deactivate_confirm' => 'Are you sure? Deactivating your account will sign you out and block login.',
+    'deactivate_account' => 'Permanently Delete Account',
+    'deactivate_confirm' => 'Are you sure? Your personal data (name, email and phone) will be permanently anonymized and your account deactivated. This cannot be undone and sign-in will be blocked. Orders, payments and delivery records are kept for business and audit purposes.',
 
 ];
