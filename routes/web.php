@@ -124,6 +124,7 @@ Route::middleware(['auth', 'role:customer'])->prefix('customer')->name('customer
     Route::get('/orders', [CustomerOrderController::class, 'index'])->name('orders');
     Route::get('/orders/{order}', [CustomerOrderController::class, 'show'])->name('orders.show');
     Route::get('/orders/{order}/tracking', [TrackingController::class, 'show'])->name('orders.tracking');
+    Route::get('/orders/{order}/track', [TrackingController::class, 'page'])->name('orders.track');
     Route::get('/orders/{order}/rate', [RatingController::class, 'index'])->name('orders.rate');
     Route::post('/orders/{order}/rate', [RatingController::class, 'store'])->name('orders.rate.submit');
 });

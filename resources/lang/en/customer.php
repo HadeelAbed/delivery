@@ -40,5 +40,7 @@ return [
     'push_unavailable' => 'Push notifications are not configured yet.',
     'push_denied' => 'Notification permission was denied.',
     'push_error' => 'Could not update push settings. Please try again.',
+    'map_loading' => 'Map loading…',
+    'eta_label' => 'ETA',
 
 ];

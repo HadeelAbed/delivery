@@ -18,8 +18,9 @@
         <div class="card">
             <h2>Live Tracking</h2>
             <p>Status: {{ $order->status->value }}</p>
-            <div id="map">Map loading…</div>
+            @include('partials.map', ['map' => $map ?? []])
             <p id="driver-info">Waiting for driver location…</p>
+            <p id="route-info"></p>
         </div>
     </main>
     <script>
@@ -32,6 +33,26 @@
                     document.getElementById('driver-info').textContent =
                         'Driver location: ' + data.driver_location.latitude + ', ' + data.driver_location.longitude +
                         ' (' + (data.driver_location.fresh ? 'fresh' : 'stale') + ')';
+
+                    // Live map marker — no-op until the maps script loads
+                    // (and never loaded when no browser key is configured).
+                    if (typeof window.__updateDriverMarker === 'function') {
+                        window.__updateDriverMarker(
+                            data.driver_location.latitude,
+                            data.driver_location.longitude
+                        );
+                    }
+                }
+                const routeEl = document.getElementById('route-info');
+                if (routeEl) {
+                    if (data.route && data.route.eta_text) {
+                        const distance = data.route.distance_km != null
+                            ? ' · ' + data.route.distance_km + ' km'
+                            : '';
+                        routeEl.textContent = '{{ __('customer.eta_label') }}: ' + data.route.eta_text + distance;
+                    } else {
+                        routeEl.textContent = '';
+                    }
                 }
             } catch (e) {}
         }
