@@ -26,6 +26,32 @@ Audit commit: `1490268`. **No hosting, credentials, or infrastructure details ar
 ## 4. Queue workers & scheduler — [PENDING]
 
 - Some behaviour relies on queue processing (`AssignOrderJob`, notification fanout). In tests `QUEUE_CONNECTION=sync` runs jobs inline; **production needs a worker** (`php artisan queue:work`) under a supervisor. Confirm which queues are used in the target environment.
+
+### Why a worker is required
+- `config/queue.php` defaults to the **`database`** queue driver (`env('QUEUE_CONNECTION','database')`), and `.env.example` sets `QUEUE_CONNECTION=database` for production.
+- `AssignOrderJob` (`implements ShouldQueue`) is the **only** queued job. It is dispatched when a merchant marks an order ready (`Merchant/OrderController@markReady`) and is responsible for **assigning the nearest active+online driver**, creating the `Delivery`, and setting the order to `assigned`.
+- With the `database` driver, a dispatched job is written to the `jobs` table and only runs when a worker consumes it. **If no worker runs in production, every `ready_for_pickup` order stays unassigned forever.** The test suite does not expose this because `phpunit.xml` forces `QUEUE_CONNECTION=sync`.
+- Required tables (`jobs`, `job_batches`, `failed_jobs`) already exist via the queue migration.
+
+### Hosting strategy options (hosting provider NOT yet decided)
+
+| Strategy | How it works | Trade-offs |
+|---|---|---|
+| **A. Persistent worker** | Long-running `php artisan queue:work --queue=default --tries=3 --max-time=3600` kept alive by Supervisor (`autorestart=true`) or the platform's native worker service. Run `php artisan queue:restart` on every deploy. | Real-time assignment (within seconds). Requires the host to support persistent background processes. |
+| **B. Cron-based worker** | A per-minute cron entry that drains then exits: `* * * * * php artisan queue:work --stop-when-empty --max-time=50 --tries=3`. | Assignment delayed up to ~1 minute. Suitable for shared hosting / cPanel that only supports cron. |
+| **C. Synchronous execution** | Set `QUEUE_CONNECTION=sync` in the production `.env`; `AssignOrderJob` then runs inline during the merchant's "mark ready" request. | No worker or cron needed at all; assignment works. Trade-off: the merchant request blocks briefly while the nearest-driver lookup runs — fine at small scale, not ideal under high order volume. **Not chosen** (would require changing production configuration — pending owner decision). |
+
+- **Status: hosting strategy undecided.** The repository contains **no deployment artifacts** (no `Procfile`, `Dockerfile`, `docker-compose.yml`, `fly.toml`, `railway.json`, `render.yaml`, `app.json`, `vapor.yml`, or CI workflow), so host capabilities are **unknown** and must not be assumed. Branch A/B/C selection is deferred until a host is chosen.
+
+### Staging verification required before launch
+- In a staging environment configured with the chosen strategy, drive one order to "ready" through the real merchant UI and **assert a `deliveries` row is created without the request doing the work** (Branch A/B) or synchronously (Branch C).
+- Confirm the `jobs` table drains and `failed_jobs` stays empty; monitor `php artisan queue:failed`.
+- Record the observed assignment latency for the chosen strategy.
+
+### Automated-test vs live verification
+- **Automated-test verified:** assignment *logic* is covered by `tests/Unit/AssignmentTest.php` and `tests/Feature/DeliveryFlowTest.php`; the async `database`-queue dispatch path is covered by `tests/Feature/AssignmentAsyncQueueTest.php`. These run with `QUEUE_CONNECTION=sync` (inline) and the async test asserts the job is enqueued and processed via `queue:work --stop-when-empty`.
+- **Live production verified: NO.** No worker has been provisioned and no staging assignment has been executed against a chosen hosting strategy. Assignment in production remains **PENDING** until the host is selected and the staging check above passes.
+- `after_commit` race investigated: **not reachable** — `OrderService::transition()`/`markReady()` perform a plain `$order->save()` with no wrapping `DB::transaction`, and no middleware wraps requests in a transaction, so the order is committed as `ready_for_pickup` **before** the job is dispatched. No `after_commit` change is required for the current code.
 - Scheduler: add `* * * * * php artisan schedule:run` if/when scheduled tasks are defined. [PENDING] — confirm scheduled tasks.
 
 ## 5. Logging, monitoring, error handling
