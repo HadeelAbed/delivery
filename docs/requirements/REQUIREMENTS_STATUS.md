@@ -1,6 +1,6 @@
 # Requirements Status — SPEC-001 Traceability
 
-- **Audit date:** 2026-10-09 · **Commit:** `1490268`
+- **Audit date:** 2026-10-09 · **Commit:** `755eafd` (supersedes `1490268`; statuses re-verified against live routes/tests at `755eafd`)
 - **Source:** `docs/ai-sdlc/specs/SPEC-001.md` (requirement IDs and terminology preserved)
 - **Counting method:** 21 counted SPEC-001 items (REQ-01…REQ-21). BLOCKED/DEFERRED excluded from the denominator. 20/21 COMPLETE, REQ-13 PARTIAL (map UI) → **~95%**.
 - **Verification legend:** 🧪 automated-test verified · 👁 manually verified · ⏳ not verified.
