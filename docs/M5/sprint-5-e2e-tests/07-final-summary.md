@@ -28,7 +28,7 @@ Fixed fee/earnings config (C-04), nearest-driver (C-05), 1–5 one-rating-per-or
 3. Pre-existing Pint style issues in untouched files (Customer/ProfileController, RatingService, MerchantFavorite, etc.).
 
 ## Deferred / open decisions
-- **Payment webhook route** (`/api/payments/callback/*` referenced in `config/payment.php` but absent from `routes/api.php`) — PLAN-001 "for production" item; blocked by C-07 mock gateways; not implemented.
+- **Payment webhook route** — correction: the route (`POST /api/payments/callback/{gateway}`, `routes/api.php`) plus `PaymentCallbackController`, HMAC mock-driver verification and `PaymentWebhookTest` coverage exist and pass; only *production* gateway credentials (C-07 mock gateways) remain deferred, not the route itself.
 - Offline-sync E2E journey — blocked by the 3 known-broken OfflineSyncTest failures (fix those first).
 - 5 known test failures repair (owner decision).
 - Driver `ready_for_pickup` notification observation (#2 above).

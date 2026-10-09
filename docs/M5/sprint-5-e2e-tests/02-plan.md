@@ -34,7 +34,7 @@ Not touched: `RatingService`, rating routes, views, rating migration.
 Reuse: existing factories (`User::factory()->merchant()/driver()/admin()`), `RefreshDatabase`, route() helpers, config('delivery.driver_earnings'). No service/controller changes for tests.
 
 ## Not in scope (documented as deferred)
-- Payment webhook route (`/api/payments/callback/*`) — PLAN-001 "for production" + C-07 mock gateways.
+- Payment webhook route (`/api/payments/callback/*`) — implemented in-repo (controller + HMAC mock drivers + tests); only *production* credentials per C-07 remain deferred. See correction note: the route exists in `routes/api.php`.
 - The 5 known sqlite-isolation test failures (3 OfflineSyncTest + 2 SanctumTokenTest).
 - Offline-sync E2E (covered by OfflineSyncTest at slice level; those tests are the known-broken ones).
 - C3–C7 analytics; any rating feature beyond repair (e.g., rating display pages).

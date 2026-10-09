@@ -6,7 +6,7 @@ Date: 2026-10-07. Read-only audit + one throwaway probe test (no app code change
 PLAN-001 "Remaining M4 Tasks":
 - [x] admin views ×3, payment callback verification, sync idempotency
 - [x] **Admin dashboard UI refinements — delivered by M5 Sprint 4** (C1 dashboard + A3/A6 nav)
-- [ ] **Payment webhook setup for production** — still genuinely unimplemented: `config/payment.php` defines `callbacks.jawwal_pay = /api/payments/callback/jawwal_pay` but **no such route exists** in `routes/api.php` (only `/api/v1/orders*` + `/api/sync`). Blocked by C-07 (mock gateways, no production credentials) → stays deferred; cannot be exercised in-repo.
+- [ ] **Payment webhook setup for production** — the in-repo webhook is implemented (`POST /api/payments/callback/{gateway}` → `PaymentCallbackController` → `PaymentService::handleCallback` with HMAC mock-driver verification, covered by `PaymentWebhookTest`); only *production* gateway credentials/sandbox remain future work per C-07 (mock gateways, no production credentials) → stays deferred; cannot be exercised against live gateways in-repo.
 - [ ] **End-to-end flow tests — THE next executable planned step** → this sprint's scope.
 
 Also SPEC-001 exit criterion 1 ("All §2 tests green") is a standing goal; the 5 known sqlite-isolation failures remain tracked separately (owner instructed not to mix them into new work).
