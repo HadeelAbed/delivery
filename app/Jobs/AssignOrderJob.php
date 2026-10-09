@@ -13,6 +13,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\DB;
 
 class AssignOrderJob implements ShouldQueue
 {
@@ -22,63 +23,74 @@ class AssignOrderJob implements ShouldQueue
 
     public function handle(): void
     {
-        $order = $this->order->fresh();
+        DB::transaction(function () {
+            // Re-fetch inside the transaction and lock the order row so two
+            // concurrent (or repeated) executions of this job cannot both pass
+            // the ready-for-pickup guard and create duplicate deliveries.
+            $order = Order::lockForUpdate()->find($this->order->id);
 
-        if ($order->status->value !== OrderStatus::ReadyForPickup->value) {
-            return;
-        }
+            if (! $order || $order->status->value !== OrderStatus::ReadyForPickup->value) {
+                return;
+            }
 
-        $merchant = User::find($order->merchant_id);
-        $merchantLat = $merchant?->merchantProfile?->latitude;
-        $merchantLng = $merchant?->merchantProfile?->longitude;
+            // Idempotency guard: if a delivery already exists for this order a
+            // previous run already assigned it. Never create a second one.
+            if (Delivery::where('order_id', $order->id)->exists()) {
+                return;
+            }
 
-        if ($merchantLat === null || $merchantLng === null) {
-            return;
-        }
+            $merchant = User::find($order->merchant_id);
+            $merchantLat = $merchant?->merchantProfile?->latitude;
+            $merchantLng = $merchant?->merchantProfile?->longitude;
 
-        $drivers = User::driver()
-            ->where('status', 'active')
-            ->where('is_online', true)
-            ->get()
-            ->map(function (User $driver) use ($merchantLat, $merchantLng) {
-                $location = DriverLocation::where('driver_id', $driver->id)
-                    ->latest('recorded_at')
-                    ->first();
+            if ($merchantLat === null || $merchantLng === null) {
+                return;
+            }
 
-                if (! $location) {
-                    return null;
-                }
+            $drivers = User::driver()
+                ->where('status', 'active')
+                ->where('is_online', true)
+                ->get()
+                ->map(function (User $driver) use ($merchantLat, $merchantLng) {
+                    $location = DriverLocation::where('driver_id', $driver->id)
+                        ->latest('recorded_at')
+                        ->first();
 
-                $distance = $this->haversine(
-                    (float) $merchantLat,
-                    (float) $merchantLng,
-                    (float) $location->latitude,
-                    (float) $location->longitude,
-                );
+                    if (! $location) {
+                        return null;
+                    }
 
-                return ['driver' => $driver, 'distance' => $distance];
-            })
-            ->filter()
-            ->sortBy('distance');
+                    $distance = $this->haversine(
+                        (float) $merchantLat,
+                        (float) $merchantLng,
+                        (float) $location->latitude,
+                        (float) $location->longitude,
+                    );
 
-        $nearest = $drivers->first();
+                    return ['driver' => $driver, 'distance' => $distance];
+                })
+                ->filter()
+                ->sortBy('distance');
 
-        if (! $nearest) {
-            return;
-        }
+            $nearest = $drivers->first();
 
-        $driver = $nearest['driver'];
+            if (! $nearest) {
+                return;
+            }
 
-        Delivery::create([
-            'order_id' => $order->id,
-            'driver_id' => $driver->id,
-            'status' => 'assigned',
-        ]);
+            $driver = $nearest['driver'];
 
-        $order->status = OrderStatus::Assigned;
-        $order->save();
+            Delivery::create([
+                'order_id' => $order->id,
+                'driver_id' => $driver->id,
+                'status' => 'assigned',
+            ]);
 
-        event(new OrderStatusChanged($order, OrderStatus::ReadyForPickup->value, OrderStatus::Assigned->value));
+            $order->status = OrderStatus::Assigned;
+            $order->save();
+
+            event(new OrderStatusChanged($order, OrderStatus::ReadyForPickup->value, OrderStatus::Assigned->value));
+        });
     }
 
     private function haversine(float $lat1, float $lng1, float $lat2, float $lng2): float
