@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Enums\OrderStatus;
+use App\Enums\UserRole;
 use App\Models\Delivery;
 use App\Models\Order;
 use App\Models\SyncOutbox;
@@ -63,6 +64,12 @@ class SyncService
                 continue;
             }
 
+            if (! $this->authorizeDeliveryAction($user, $order, $type)) {
+                $conflicts[] = ['uuid' => $uuid, 'reason' => 'unauthorized'];
+
+                continue;
+            }
+
             try {
                 DB::transaction(function () use ($user, $order, $type, $uuid, $payload, $action) {
                     app(OrderService::class)->transition($order, $type);
@@ -86,6 +93,38 @@ class SyncService
         }
 
         return ['ack' => $ack, 'conflicts' => $conflicts];
+    }
+
+    /**
+     * Authorize an offline delivery action.
+     *
+     * Offline sync is a driver-only surface: assignment stays server-side
+     * (AssignOrderJob), and delivery-lifecycle transitions require a delivery
+     * assigned to the authenticated driver. Customers, merchants, unassigned
+     * orders, and other drivers' deliveries are rejected as unauthorized without
+     * mutating order or delivery state.
+     */
+    private function authorizeDeliveryAction(User $user, Order $order, string $type): bool
+    {
+        // Assignment is never performed through offline sync — it stays with AssignOrderJob.
+        if ($type === OrderStatus::Assigned->value) {
+            return false;
+        }
+
+        // Delivery-lifecycle transitions require an authenticated, assigned driver.
+        if (in_array($type, ['out_for_delivery', 'delivered', 'failed'], true)) {
+            if ($user->role !== UserRole::Driver) {
+                return false;
+            }
+
+            return Delivery::query()
+                ->where('order_id', $order->id)
+                ->where('driver_id', $user->id)
+                ->exists();
+        }
+
+        // Any other transition is not permitted through the offline sync surface.
+        return false;
     }
 
     /**

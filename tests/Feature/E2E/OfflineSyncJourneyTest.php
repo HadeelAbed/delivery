@@ -3,6 +3,7 @@
 namespace Tests\Feature\E2E;
 
 use App\Models\Category;
+use App\Models\Delivery;
 use App\Models\DriverLocation;
 use App\Models\Merchant;
 use App\Models\Order;
@@ -140,7 +141,7 @@ class OfflineSyncJourneyTest extends TestCase
         $order = Order::create([
             'customer_id' => $customer->id,
             'merchant_id' => $merchant->id,
-            'status' => 'ready_for_pickup',
+            'status' => 'assigned',
             'items_total' => 25.00,
             'delivery_fee' => 15.00,
             'total' => 40.00,
@@ -148,21 +149,23 @@ class OfflineSyncJourneyTest extends TestCase
             'payment_method' => 'cod',
         ]);
 
-        // Multi-action batch drives ready -> assigned -> out_for_delivery -> delivered in ONE request.
-        // Observed current behavior: this path creates no `deliveries` row (delivery-row creation
-        // lives in AssignOrderJob's web flow; sync payload carries only order_id).
+        // Legitimate offline-driver workflow: a delivery assigned to this driver.
+        Delivery::create(['order_id' => $order->id, 'driver_id' => $driver->id, 'status' => 'assigned']);
+
+        // Multi-action batch drives assigned -> out_for_delivery -> delivered in ONE request,
+        // all authorized because the delivery is assigned to the syncing driver.
         $batch = [
-            ['client_uuid' => 's-1', 'type' => 'assigned', 'payload' => ['order_id' => $order->id], 'at' => now()->subMinutes(3)->toIso8601String()],
-            ['client_uuid' => 's-2', 'type' => 'out_for_delivery', 'payload' => ['order_id' => $order->id], 'at' => now()->subMinutes(2)->toIso8601String()],
-            ['client_uuid' => 's-3', 'type' => 'delivered', 'payload' => ['order_id' => $order->id], 'at' => now()->subMinute()->toIso8601String()],
+            ['client_uuid' => 's-1', 'type' => 'out_for_delivery', 'payload' => ['order_id' => $order->id], 'at' => now()->subMinutes(3)->toIso8601String()],
+            ['client_uuid' => 's-2', 'type' => 'delivered', 'payload' => ['order_id' => $order->id], 'at' => now()->subMinute()->toIso8601String()],
         ];
         $sync = $this->withHeader('Authorization', 'Bearer '.$this->bearer($driver))
             ->postJson('/api/sync', ['actions' => $batch]);
         $sync->assertOk();
         $this->assertSame('processed', $sync->json('ack.0.status'));
-        $this->assertSame('processed', $sync->json('ack.2.status'));
+        $this->assertSame('processed', $sync->json('ack.1.status'));
         $this->assertSame('delivered', $order->fresh()->status->value);
-        $this->assertDatabaseMissing('deliveries', ['order_id' => $order->id]);
+        // The driver's own delivery row is mirrored to delivered by the sync path.
+        $this->assertSame('delivered', Delivery::where('order_id', $order->id)->first()->status);
 
         // A stale queued action (older client timestamp) must not regress server state (REQ-11)
         $stale = $this->withHeader('Authorization', 'Bearer '.$this->bearer($driver))
@@ -189,7 +192,7 @@ class OfflineSyncJourneyTest extends TestCase
         $order = Order::create([
             'customer_id' => $customer->id,
             'merchant_id' => $merchant->id,
-            'status' => 'ready_for_pickup',
+            'status' => 'assigned',
             'items_total' => 25.00,
             'delivery_fee' => 15.00,
             'total' => 40.00,
@@ -197,9 +200,12 @@ class OfflineSyncJourneyTest extends TestCase
             'payment_method' => 'cod',
         ]);
 
+        // Legitimate offline-driver workflow: a delivery assigned to this driver.
+        Delivery::create(['order_id' => $order->id, 'driver_id' => $driver->id, 'status' => 'assigned']);
+
         $batch = [
             ['client_uuid' => 'm-1', 'type' => 'delivered', 'payload' => ['order_id' => $order->id], 'at' => now()->toIso8601String()],
-            ['client_uuid' => 'm-2', 'type' => 'assigned', 'payload' => ['order_id' => $order->id], 'at' => now()->toIso8601String()],
+            ['client_uuid' => 'm-2', 'type' => 'out_for_delivery', 'payload' => ['order_id' => $order->id], 'at' => now()->toIso8601String()],
         ];
 
         $response = $this->withHeader('Authorization', 'Bearer '.$this->bearer($driver))
@@ -212,7 +218,7 @@ class OfflineSyncJourneyTest extends TestCase
         $this->assertSame('processed', $response->json('ack.0.status'));
         $this->assertSame('m-2', $response->json('ack.0.uuid'));
         // Server state advanced only as far as the legal action; outbox has only m-2
-        $this->assertSame('assigned', $order->fresh()->status->value);
+        $this->assertSame('out_for_delivery', $order->fresh()->status->value);
         $this->assertSame(1, SyncOutbox::where('id', 'm-2')->count());
         $this->assertSame(0, SyncOutbox::where('id', 'm-1')->count());
     }

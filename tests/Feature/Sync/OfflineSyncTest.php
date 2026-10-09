@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Sync;
 
+use App\Models\Delivery;
 use App\Models\Order;
 use App\Models\SyncOutbox;
 use App\Models\User;
@@ -34,11 +35,14 @@ class OfflineSyncTest extends TestCase
 
     public function test_queued_action_syncs_without_duplicate(): void
     {
-        [$driver, $order] = $this->makeDriverWithOrder('ready_for_pickup');
+        [$driver, $order] = $this->makeDriverWithOrder('assigned');
+
+        // Legitimate offline-driver workflow: a delivery assigned to this driver.
+        Delivery::create(['order_id' => $order->id, 'driver_id' => $driver->id, 'status' => 'assigned']);
 
         $action = [
             'client_uuid' => 'u-1',
-            'type' => 'assigned',
+            'type' => 'out_for_delivery',
             'payload' => ['order_id' => $order->id],
             'at' => now()->toIso8601String(),
         ];
@@ -51,7 +55,7 @@ class OfflineSyncTest extends TestCase
         $response2->assertStatus(200);
         $this->assertSame('already_processed', $response2->json('ack.0.status'));
 
-        $this->assertSame('assigned', $order->fresh()->status->value);
+        $this->assertSame('out_for_delivery', $order->fresh()->status->value);
         $this->assertSame(1, SyncOutbox::where('id', 'u-1')->count());
     }
 
