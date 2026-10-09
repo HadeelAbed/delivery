@@ -79,6 +79,14 @@
             </div>
 
             <div class="bg-white p-6 rounded-lg shadow mb-6">
+                <h3 class="font-semibold mb-4">{{ __('customer.push_notifications') }}</h3>
+                <p class="text-sm text-gray-600 mb-3">{{ __('customer.push_notifications_hint') }}</p>
+                <button type="button" id="push-opt-in" class="btn btn-secondary w-full" hidden>{{ __('customer.enable_push') }}</button>
+                <button type="button" id="push-opt-out" class="btn btn-secondary w-full" hidden>{{ __('customer.disable_push') }}</button>
+                <p id="push-status" class="text-sm text-gray-600 mt-2"></p>
+            </div>
+
+            <div class="bg-white p-6 rounded-lg shadow mb-6">
                 <h3 class="font-semibold mb-4">{{ __('customer.deactivate_account') }}</h3>
                 <p class="text-sm text-gray-600 mb-3">{{ __('customer.deactivate_confirm') }}</p>
                 <form action="{{ route('account.deactivate') }}" method="POST">
@@ -93,5 +101,93 @@
         @endif
 
     </div>
+    <script>
+        (function () {
+            var optIn = document.getElementById('push-opt-in');
+            var optOut = document.getElementById('push-opt-out');
+            var statusEl = document.getElementById('push-status');
+            var vapidKey = '{{ config('webpush.vapid_public_key') }}';
+            var csrf = '{{ csrf_token() }}';
+
+            function setStatus(text) {
+                if (statusEl) statusEl.textContent = text;
+            }
+
+            function urlBase64ToUint8Array(base64String) {
+                var padding = '='.repeat((4 - base64String.length % 4) % 4);
+                var base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+                var raw = window.atob(base64);
+                var output = new Uint8Array(raw.length);
+                for (var i = 0; i < raw.length; i++) output[i] = raw.charCodeAt(i);
+                return output;
+            }
+
+            async function refresh() {
+                if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+                    setStatus('{{ __('customer.push_unsupported') }}');
+                    return;
+                }
+                try {
+                    var reg = await navigator.serviceWorker.getRegistration();
+                    var sub = reg ? await reg.pushManager.getSubscription() : null;
+                    optIn.hidden = !!sub;
+                    optOut.hidden = !sub;
+                    setStatus(sub ? '{{ __('customer.push_enabled') }}' : '{{ __('customer.push_disabled') }}');
+                } catch (e) {
+                    setStatus('{{ __('customer.push_unsupported') }}');
+                }
+            }
+
+            async function postJson(url, body) {
+                var res = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf, 'Accept': 'application/json' },
+                    credentials: 'same-origin',
+                    body: JSON.stringify(body || {}),
+                });
+                if (!res.ok) throw new Error('request failed');
+                return res.json();
+            }
+
+            if (optIn) optIn.addEventListener('click', async function () {
+                setStatus('');
+                try {
+                    if (!vapidKey) {
+                        setStatus('{{ __('customer.push_unavailable') }}');
+                        return;
+                    }
+                    var permission = await Notification.requestPermission();
+                    if (permission !== 'granted') {
+                        setStatus('{{ __('customer.push_denied') }}');
+                        return;
+                    }
+                    var reg = await navigator.serviceWorker.register('/sw.js');
+                    var sub = await reg.pushManager.subscribe({
+                        userVisibleOnly: true,
+                        applicationServerKey: urlBase64ToUint8Array(vapidKey),
+                    });
+                    await postJson('{{ route('push.subscribe') }}', sub.toJSON());
+                    await refresh();
+                } catch (e) {
+                    setStatus('{{ __('customer.push_error') }}');
+                }
+            });
+
+            if (optOut) optOut.addEventListener('click', async function () {
+                try {
+                    var reg = await navigator.serviceWorker.getRegistration();
+                    var sub = reg ? await reg.pushManager.getSubscription() : null;
+                    var endpoint = sub ? sub.endpoint : null;
+                    if (sub) await sub.unsubscribe();
+                    if (endpoint) await postJson('{{ route('push.unsubscribe') }}', { endpoint: endpoint });
+                    await refresh();
+                } catch (e) {
+                    setStatus('{{ __('customer.push_error') }}');
+                }
+            });
+
+            refresh();
+        })();
+    </script>
 </body>
 </html>

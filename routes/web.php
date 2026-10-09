@@ -26,6 +26,7 @@ use App\Http\Controllers\Merchant\DashboardController as MerchantDashboardContro
 use App\Http\Controllers\Merchant\OrderController as MerchantOrderController;
 use App\Http\Controllers\Merchant\ProductController;
 use App\Http\Controllers\Merchant\ProfileController;
+use App\Http\Controllers\PushSubscriptionController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', fn () => view('welcome'))->name('welcome');
@@ -40,6 +41,11 @@ Route::middleware('guest')->group(function () {
 Route::post('/logout', [LogoutController::class, 'store'])->middleware('auth')->name('logout');
 
 Route::post('/account/deactivate', [DeactivateController::class, 'store'])->middleware('auth')->name('account.deactivate');
+
+Route::middleware(['auth', 'throttle:30,1'])->group(function () {
+    Route::post('/push/subscribe', [PushSubscriptionController::class, 'store'])->name('push.subscribe');
+    Route::post('/push/unsubscribe', [PushSubscriptionController::class, 'destroy'])->name('push.unsubscribe');
+});
 
 Route::middleware(['auth', 'role:customer'])->group(function () {
     Route::get('/customer', [HomeController::class, 'index'])->name('customer.home');

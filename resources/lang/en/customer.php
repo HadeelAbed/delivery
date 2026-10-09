@@ -30,5 +30,15 @@ return [
     'driver_score' => 'Driver score',
     'deactivate_account' => 'Permanently Delete Account',
     'deactivate_confirm' => 'Are you sure? Your personal data (name, email and phone) will be permanently anonymized and your account deactivated. This cannot be undone and sign-in will be blocked. Orders, payments and delivery records are kept for business and audit purposes.',
+    'push_notifications' => 'Push Notifications',
+    'push_notifications_hint' => 'Get order updates on this device even when the page is closed.',
+    'enable_push' => 'Enable Push Notifications',
+    'disable_push' => 'Disable Push Notifications',
+    'push_enabled' => 'Push notifications are enabled on this device.',
+    'push_disabled' => 'Push notifications are off on this device.',
+    'push_unsupported' => 'This browser does not support push notifications.',
+    'push_unavailable' => 'Push notifications are not configured yet.',
+    'push_denied' => 'Notification permission was denied.',
+    'push_error' => 'Could not update push settings. Please try again.',
 
 ];
