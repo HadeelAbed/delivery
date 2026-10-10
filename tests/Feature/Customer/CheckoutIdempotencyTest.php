@@ -149,7 +149,6 @@ class CheckoutIdempotencyTest extends TestCase
         $this->assertSame(2, Order::where('customer_id', $customer->id)->count());
     }
 
-
     public function test_validation_failure_does_not_consume_token_and_retry_succeeds(): void
     {
         $customer = User::factory()->create();
