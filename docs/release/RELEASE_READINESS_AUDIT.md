@@ -1,8 +1,9 @@
 # Pre-Release Readiness Audit — Gaza Delivery Marketplace
 
-- **Audit commit:** `a2ba9bf52e1de65e021cef97fe7cf996b751a15d`
-- **Audit date:** 2026-10-09
-- **Scope rule:** no application code, tests, migrations, dependencies, config, or environment files were modified. No secrets generated or printed. No software installed. No Git history rewritten.
+- **Audit commit:** `88e1e2260eecdafa289063d690017df814f87f98` (re-verification pass)
+- **Previous audit commit:** `a2ba9bf52e1de65e021cef97fe7cf996b751a15d`
+- **Audit date:** 2026-10-10
+- **Scope rule:** hosting-independent re-verification only. No deployment, no hosting selection, no software installed (k6 not installed), no live credentials configured, no secrets generated or printed. No Git history rewritten (the two commits since the prior audit are additive). Changes documented here reflect work merged to `master` before this pass.
 
 > Status labels: **Implemented** · **Automated-test verified** · **Live integration verified** · **Pending** · **Deferred**.
 
@@ -12,7 +13,7 @@
 
 **Verdict: NOT YET RELEASE-READY — blocked by two required live integrations (Web Push VAPID, Google Maps keys), one required production queue worker, and one unmeasured performance gate (k6).**
 
-The application core is functionally complete and fully green under automated testing: **144 tests / 551 assertions, 0 failures.** Customer, merchant, driver, admin, order lifecycle, offline sync (with the ownership security fix), payments, ratings, deactivation + anonymization, localization, and demo seeders are all implemented and covered.
+The application core is functionally complete and fully green under automated testing: **156 tests / 596 assertions, 0 failures** (11.6s). Customer, merchant, driver, admin, order lifecycle, offline sync (with the ownership security fix), duplicate-checkout idempotency protection, payments, ratings, deactivation + anonymization, localization, and demo seeders are all implemented and covered.
 
 What is **not** ready is launch configuration and evidence:
 
@@ -31,11 +32,10 @@ None of the above are application-code defects. They are credential, infrastruct
 | Item | Value | Evidence |
 |---|---|---|
 | Branch | `master` | `git rev-parse --abbrev-ref HEAD` |
-| Local HEAD | `a2ba9bf52e1de65e021cef97fe7cf996b751a15d` | `git rev-parse HEAD` |
-| `origin/master` | `a2ba9bf52e1de65e021cef97fe7cf996b751a15d` | `git rev-parse origin/master` (after `fetch`) |
-| HEAD == remote | **Yes** | equal hashes |
+| Local HEAD | `88e1e2260eecdafa289063d690017df814f87f98` | `git rev-parse HEAD` |
+| `origin/master` | `88e1e2260eecdafa289063d690017df814f87f98` | `git rev-parse origin/master` (after `fetch`); `git ls-remote origin refs/heads/master` confirms |
+| HEAD == remote | **Yes** | equal hashes; `git rev-list --left-right --count master...origin/master` → `0 0` |
 | Working tree | **Clean of tracked changes** | `git status --short` shows only `??` untracked |
-| Docs commit on remote | **Yes** | `git branch -r --contains a2ba9bf` → `origin/master` |
 | Uncommitted security fixes | **None** | no staged/modified tracked files |
 
 **Untracked artifacts (pre-existing, preserved):** `.opencode/`, `dbg_synservice.ps1`, `dbg_synservice2.ps1`, `fix_synservice.ps1`, `fix_synservice2.ps1`, `inspect_order.php`, `storage/`.
@@ -44,11 +44,13 @@ None of the above are application-code defects. They are credential, infrastruct
 
 | Commit | Message |
 |---|---|
+| `88e1e22` | style: fix blank-line separation in checkout idempotency test |
+| `b86b1ca` | fix: prevent duplicate checkout submissions |
+| `8be75c8` | fix: make driver assignment atomic and idempotent |
+| `b4f3d4c` | docs: refresh requirements audit commit reference |
+| `755eafd` | docs: document queue worker deployment requirement and hosting options |
+| `7f197f6` | test: cover async database-queue assignment path |
 | `a2ba9bf` | docs: add project documentation and roles/permissions audit |
-| `1490268` | fix: enforce driver ownership on offline order sync |
-| `596239d` | test: add k6 local load-test suite for req-17 |
-| `173c2c1` | feat: add google maps tracking ui with routing eta and graceful fallback |
-| `50e5285` | feat: add web push notifications with vapid config and graceful fallback |
 
 ---
 
@@ -56,8 +58,9 @@ None of the above are application-code defects. They are credential, infrastruct
 
 | Area | Status | Evidence |
 |---|---|---|
-| Full test suite | **Automated-test verified** | `php artisan test` → 144 passed (551 assertions), 0 failures (23.4s) |
+| Full test suite | **Automated-test verified** | `php artisan test` → 156 passed (596 assertions), 0 failures (11.6s) |
 | Offline-sync ownership security fix | **Automated-test verified** | `SyncService::authorizeDeliveryAction` + `SyncAuthorizationTest` (9 tests) |
+| Duplicate-checkout idempotency | **Automated-test verified** | `orders(customer_id, idempotency_key)` unique index + `CheckoutController` replay guard (customer-scoped lookup, re-throws when no matching order); `CheckoutIdempotencyTest` (7 tests) |
 | Payment callback integrity (Jawwal/PalPay) | **Implemented + Automated-test verified** | HMAC-SHA256 `verifyCallback` with `hash_equals`; `CodDriver` no-op |
 | Merchant/driver approval gate | **Automated-test verified** | `RequireApproved` middleware + tests |
 | RBAC + server-side authorization | **Automated-test verified** | `RoleMiddleware`, 4 policies, `RbacRouteTest` |
@@ -157,7 +160,7 @@ Ordered by launch impact. Steps B1/B2/B4 require explicit owner approval (creden
 | **Pending** | Implemented/needed but awaiting credentials, infrastructure, or an executed run (B1–B5). |
 | **Deferred** | Explicitly out of V1 scope (analytics C3–C7, the nine extended-scope items). |
 
-Current tally: **144 tests / 551 assertions / 0 failures = Automated-test verified. Live-verified count = 0.** No integration is claimed production-ready on the strength of automated tests alone.
+Current tally: **156 tests / 596 assertions / 0 failures = Automated-test verified. Live-verified count = 0.** No integration is claimed production-ready on the strength of automated tests alone.
 
 ---
 
@@ -173,3 +176,20 @@ Current tally: **144 tests / 551 assertions / 0 failures = Automated-test verifi
 - [ ] HEAD == `origin/master`; only intended files committed; no untracked strays staged.
 
 **Go/No-go:** do not launch until B3 is closed (functional risk) and B1/B2 are either live-verified or consciously accepted as fallback-only. B4 is the outstanding SPEC-001 exit criterion; B5 is hygiene.
+
+---
+
+## 8. Re-verification pass (2026-10-10) — hosting-independent
+
+Added after the two additive commits `b86b1ca` (duplicate-checkout idempotency) and `88e1e22` (its style fix). This pass performed only checks that require **no** deployment, hosting selection, k6 install, or live credentials.
+
+**Verified (fresh evidence):**
+- `git rev-parse HEAD` == `origin/master` == `88e1e22`; `git ls-remote origin refs/heads/master` and `git rev-list --left-right --count master...origin/master` (`0 0`) confirm the shared branch is in sync. Working tree has no tracked modifications; only the pre-existing untracked strays remain (`git status --short`).
+- `php artisan test` → **156 passed / 596 assertions / 0 failures** (11.6s), up from 144/551.
+- `git diff --cached --check` clean for the feature commit.
+
+**Idempotency handler review (targeted, passed):** `CheckoutController::place` catches `UniqueConstraintViolationException` but does **not** blindly convert it to success. It re-queries `Order::where('customer_id', Auth::id())->where('idempotency_key', $idempotencyKey)->first()`; if no such persisted order exists it **re-throws** the exception. The `orders` table's only live unique index on this path is `(customer_id, idempotency_key)` (`payments.reference_id` is `NULL` for COD/pending, so multiple NULLs are permitted and it cannot fire). The failed insert is rolled back by the surrounding `DB::transaction`, so the lookup only ever returns the previously committed order — scoped to the authenticated customer. Verified by `CheckoutIdempotencyTest` (7 tests: repeat, same-order return, fresh-token new order, stale-form-after-success, validation-retry, cross-customer isolation, DB-constraint proof).
+
+**Pint gate (hosting-independent hygiene):** `vendor/bin/pint --test` over the whole repo still reports the pre-existing `inspect_order.php` issues (B5, untracked stray — out of scope to modify). The new `CheckoutIdempotencyTest.php` initially failed `class_attributes_separation` (a double blank line); this was corrected in `88e1e22` and now **passes** `pint --test`. No committed tracked file fails Pint except via the untracked stray.
+
+**Still pending (unchanged, require out-of-scope resources):** B1 (VAPID), B2 (Google Maps keys), B3 (queue worker / hosting), B4 (k6 install + run). This pass did **not** deploy, select a host, install k6, or configure any live credentials.
