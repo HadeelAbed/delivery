@@ -6,6 +6,7 @@
     <h2>Checkout</h2>
     <form method="POST" action="{{ route('customer.checkout.place') }}">
         @csrf
+        <input type="hidden" name="idempotency_key" value="{{ $idempotencyKey }}\">
 
         <label for="address_label">Delivery address</label>
         <input id="address_label" name="address[label]" placeholder="e.g. Gaza, Al-Rimal, Building 5" required>

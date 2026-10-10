@@ -24,6 +24,7 @@ class Order extends Model
         'payment_method',
         'prep_time_minutes',
         'reject_reason',
+        'idempotency_key',
     ];
 
     protected $casts = [

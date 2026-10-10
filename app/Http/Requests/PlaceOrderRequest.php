@@ -19,6 +19,7 @@ class PlaceOrderRequest extends FormRequest
             'address.lat' => ['required', 'numeric', 'between:-90,90'],
             'address.lng' => ['required', 'numeric', 'between:-180,180'],
             'payment_method' => ['required', 'string', 'in:cod,jawwal_pay,palpay'],
+            'idempotency_key' => ['nullable', 'string', 'max:64'],
         ];
     }
 }

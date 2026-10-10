@@ -17,7 +17,7 @@ use InvalidArgumentException;
 
 class OrderService
 {
-    public function place(User $customer, User $merchant, array $items, array $address, string $paymentMethod): Order
+    public function place(User $customer, User $merchant, array $items, array $address, string $paymentMethod, ?string $idempotencyKey = null): Order
     {
         if ($merchant->role !== UserRole::Merchant || ! $merchant->isApproved()) {
             throw new InvalidArgumentException('Invalid merchant.');
@@ -53,7 +53,7 @@ class OrderService
         $deliveryFee = (float) config('delivery.delivery_fee', 15.00);
         $total = $itemsTotal + $deliveryFee;
 
-        return DB::transaction(function () use ($customer, $merchant, $orderItems, $address, $paymentMethod, $itemsTotal, $deliveryFee, $total) {
+        return DB::transaction(function () use ($customer, $merchant, $orderItems, $address, $paymentMethod, $itemsTotal, $deliveryFee, $total, $idempotencyKey) {
             $order = Order::create([
                 'customer_id' => $customer->id,
                 'merchant_id' => $merchant->id,
@@ -63,6 +63,7 @@ class OrderService
                 'total' => $total,
                 'delivery_address' => $address,
                 'payment_method' => $paymentMethod,
+                'idempotency_key' => $idempotencyKey,
             ]);
 
             foreach ($orderItems as $item) {
