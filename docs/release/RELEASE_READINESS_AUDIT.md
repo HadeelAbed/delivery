@@ -1,9 +1,9 @@
 # Pre-Release Readiness Audit — Gaza Delivery Marketplace
 
-- **Audit commit:** `88e1e2260eecdafa289063d690017df814f87f98` (re-verification pass)
+- **Audit commit:** `686cd462d2891cad4092c472735574e74ef012cd` (this re-verification + triage pass)
 - **Previous audit commit:** `a2ba9bf52e1de65e021cef97fe7cf996b751a15d`
 - **Audit date:** 2026-10-10
-- **Scope rule:** hosting-independent re-verification only. No deployment, no hosting selection, no software installed (k6 not installed), no live credentials configured, no secrets generated or printed. No Git history rewritten (the two commits since the prior audit are additive). Changes documented here reflect work merged to `master` before this pass.
+- **Scope rule:** hosting-independent re-verification only. No deployment, no hosting selection, no software installed (k6 not installed), no live credentials configured, no secrets generated or printed. No Git history rewritten (the three additive commits since the prior audit are additive). This pass's changes are reflected here in §9 and the corrected B5; deletion of the untracked strays is an owner decision and is not performed.
 
 > Status labels: **Implemented** · **Automated-test verified** · **Live integration verified** · **Pending** · **Deferred**.
 
@@ -32,25 +32,32 @@ None of the above are application-code defects. They are credential, infrastruct
 | Item | Value | Evidence |
 |---|---|---|
 | Branch | `master` | `git rev-parse --abbrev-ref HEAD` |
-| Local HEAD | `88e1e2260eecdafa289063d690017df814f87f98` | `git rev-parse HEAD` |
-| `origin/master` | `88e1e2260eecdafa289063d690017df814f87f98` | `git rev-parse origin/master` (after `fetch`); `git ls-remote origin refs/heads/master` confirms |
+| Local HEAD | `686cd462d2891cad4092c472735574e74ef012cd` | `git rev-parse HEAD` |
+| `origin/master` | `686cd462d2891cad4092c472735574e74ef012cd` | `git rev-parse origin/master` (after `fetch`); `git ls-remote origin refs/heads/master` confirms |
 | HEAD == remote | **Yes** | equal hashes; `git rev-list --left-right --count master...origin/master` → `0 0` |
 | Working tree | **Clean of tracked changes** | `git status --short` shows only `??` untracked |
 | Uncommitted security fixes | **None** | no staged/modified tracked files |
 
-**Untracked artifacts (pre-existing, preserved):** `.opencode/`, `dbg_synservice.ps1`, `dbg_synservice2.ps1`, `fix_synservice.ps1`, `fix_synservice2.ps1`, `inspect_order.php`, `storage/`.
+
+
+**Untracked artifacts (pre-existing, preserved):** the **7 top-level `git status --short` `??` entries** (2 directory entries = `.opencode/` + `storage/`; 5 file entries); **NOT** the total recursive file count. Recursive untracked inventory (scope: repo root; exclusions: automation tooling `node_modules` trees + this audit's 2 capture temp files, removed) = **19 untracked files**, none staged or modified by this audit. Top-level entries: `.opencode/`, `dbg_synservice.ps1`, `dbg_synservice2.ps1`, `fix_synservice.ps1`, `fix_synservice2.ps1`, `inspect_order.php`, `storage/`.
 
 **Recent commit chain (verified):**
 
 | Commit | Message |
 |---|---|
+| `686cd46` | docs: refresh pre-release readiness audit after idempotency fix |
 | `88e1e22` | style: fix blank-line separation in checkout idempotency test |
 | `b86b1ca` | fix: prevent duplicate checkout submissions |
 | `8be75c8` | fix: make driver assignment atomic and idempotent |
 | `b4f3d4c` | docs: refresh requirements audit commit reference |
 | `755eafd` | docs: document queue worker deployment requirement and hosting options |
 | `7f197f6` | test: cover async database-queue assignment path |
+| `cb42b6b` | docs: add pre-release readiness audit |
 | `a2ba9bf` | docs: add project documentation and roles/permissions audit |
+| `1490268` | fix: enforce driver ownership on offline order sync |
+| `596239d` | test: add k6 local load-test suite for req-17 |
+| `173c2c1` | feat: add google maps tracking ui with routing eta and graceful fallback |
 
 ---
 
@@ -113,11 +120,12 @@ Inspected `app/Services/SyncService.php` directly. Confirmed:
 - **Impact:** SPEC-001 exit criterion 4 (load/performance evidence) is unmet. **No performance target can be claimed.** The 1–3s order-propagation target is measured by the script but has never been run.
 - **To close:** install k6 (requires approval), seed per README, run `k6 run k6/load-test.js` against a **safe local/staging** environment (never production), capture `--summary-export=k6-summary.json`, and record actual numbers.
 
-### B5 — Untracked debug artifacts not git-ignored
+### B5 — Untracked debug artifacts (untracked; `inspect_order.php` breaks whole-repo `pint --test`)
 - **Status:** Hygiene · **PENDING**
-- **Evidence:** `.gitignore` has **no** entries for `inspect_order.php`, `dbg_*.ps1`, `fix_*.ps1` (grep returned empty). These remain untracked (`??`) and one (`inspect_order.php`) trips `pint --test` at repo scope.
-- **Impact:** Low. They are untracked and do not ship, but they clutter the tree and can break a whole-repo Pint gate in CI.
-- **To close:** add ignore rules (or delete the strays) — a small, non-code change.
+- **Evidence (re-verified 2026-10-10):** `.gitignore` has **no** entries for `inspect_order.php`, `dbg_*.ps1`, `fix_*.ps1`. These remain untracked (`??`). Application code is clean — `vendor/bin/pint --test app tests config database routes resources` → **192 files PASS (exit 0)**. The **only** whole-repo failure is the untracked debug file: `vendor/bin/pint --test` → **196 files, 1 style issue, in `inspect_order.php`** (`single_quote, fully_qualified_strict_types, concat_space, no_closing_tag, single_line_after_import`). There is **no CI workflow** in the repo and **no `pint.json`**, so Pint uses its built-in preset over the whole tree with no path scoping.
+- **Correction to prior advice:** **Pint does not honor `.gitignore`.** Proven empirically — with `inspect_order.php` present in `.gitignore`, `pint --test` **still** flagged it. Therefore *adding ignore rules will NOT clear the whole-repo Pint gate.* The gate can only be satisfied by **deleting** the file (or excluding it via a `pint.json` `notPath`/finder rule), not by ignoring it.
+- **Impact:** Low. The strays are untracked and do not ship. But `inspect_order.php` makes a whole-repo `pint --test` fail if anyone wires that command into CI, and it is a stale script (see §9).
+- **To close:** delete `inspect_order.php` (recommended — it is a broken one-off, see §9). For the `.ps1` debug scripts, delete them; they are not in Pint's PHP-only scope, so ignoring them would silence only `git status`, not any gate.
 
 ---
 
@@ -146,7 +154,9 @@ Ordered by launch impact. Steps B1/B2/B4 require explicit owner approval (creden
    - Only after a recorded run may the 1–3s propagation / 7s cadence thresholds be called **met**.
 
 5. **B5 — Repo hygiene (small, non-code).**
-   - Add `.gitignore` entries (or delete) `inspect_order.php`, `dbg_*.ps1`, `fix_*.ps1` so whole-repo `pint --test` stays green. Leave the untracked files untouched if only ignoring.
+   - **Delete** `inspect_order.php` — it is the sole whole-repo `pint --test` failure, and Pint ignores `.gitignore` (proven), so ignoring will not clear the gate. Deleting the already-applied, obsolete `fix_synservice*.ps1` / `dbg_synservice*.ps1` (see §9) is also recommended.
+   - Alternatively, add a `pint.json` that scopes Pint to `app`, `tests`, `config`, `database`, `routes`, `resources` (or a `notPath` exclude for the strays) so whole-repo `pint --test` passes without touching the files. `.gitignore` alone is **insufficient**.
+   - Untracked files are preserved (not deleted) by this audit; deletion is an owner decision.
 
 ---
 
@@ -166,11 +176,17 @@ Current tally: **156 tests / 596 assertions / 0 failures = Automated-test verifi
 
 ## 7. Final release checklist
 
+8. **B1 live push**: no live browser push delivery exercised.
+9. **B2 live map**: no live keys/render/polling/ETA exercised.
+10. **B4 performance**: no k6 run → 1–3s propagation / 7s cadence thresholds **unmeasured**.
+
+**Go/No-go:** do not launch until **B3** is closed (functional risk), **B1/B2** are either live-verified or consciously accepted as fallback-only, **B4** is executed, and **B5** (debug-raw tracks resolved). No external credentials, k6 installation, hosting selection, or deployment was performed by this pass.
+7. **B3 live assignment**: no live worker → live assignment path not exercised.
 - [ ] **B3** Production queue worker provisioned + monitored; assignment verified live. *(blocker — do first)*
 - [ ] **B1** VAPID keys set in the real environment (not committed); browser push delivery verified live.
 - [ ] **B2** Google Maps browser + server keys set (server key backend-only); map/route/ETA verified live.
 - [ ] **B4** k6 installed; load test executed against local/staging; `k6-summary.json` recorded; thresholds evaluated from real numbers.
-- [ ] **B5** `.gitignore` covers (or strays removed for) `inspect_order.php`, `dbg_*.ps1`, `fix_*.ps1`; repo `pint --test` green.
+- [ ] **B5** Repo hygiene: **delete** `inspect_order.php` (sole whole-repo `pint --test` failure) **or** add a `pint.json` scoping Pint to app paths — note `.gitignore` does NOT clear the Pint gate (proven). Triage of all strays in §9.
 - [ ] HTTPS enforced; secrets present in the environment only (no values in repo); DB migrations run on deploy; backups + queue + scheduler + monitoring in place (see `docs/deployment/DEPLOYMENT_AND_OPERATIONS.md`).
 - [ ] Post-deployment smoke tests pass (register → checkout → accept → ready → assign → out_for_delivery → delivered; a `/api/sync` batch; a payment callback).
 - [ ] HEAD == `origin/master`; only intended files committed; no untracked strays staged.
@@ -184,7 +200,7 @@ Current tally: **156 tests / 596 assertions / 0 failures = Automated-test verifi
 Added after the two additive commits `b86b1ca` (duplicate-checkout idempotency) and `88e1e22` (its style fix). This pass performed only checks that require **no** deployment, hosting selection, k6 install, or live credentials.
 
 **Verified (fresh evidence):**
-- `git rev-parse HEAD` == `origin/master` == `88e1e22`; `git ls-remote origin refs/heads/master` and `git rev-list --left-right --count master...origin/master` (`0 0`) confirm the shared branch is in sync. Working tree has no tracked modifications; only the pre-existing untracked strays remain (`git status --short`).
+- `git rev-parse HEAD` == `origin/master` == `686cd46`; `git ls-remote origin refs/heads/master` and `git rev-list --left-right --count master...origin/master` (`0 0`) confirm the shared branch is in sync. Working tree has no tracked modifications; only the pre-existing untracked strays remain (`git status --short`).
 - `php artisan test` → **156 passed / 596 assertions / 0 failures** (11.6s), up from 144/551.
 - `git diff --cached --check` clean for the feature commit.
 
@@ -193,3 +209,40 @@ Added after the two additive commits `b86b1ca` (duplicate-checkout idempotency) 
 **Pint gate (hosting-independent hygiene):** `vendor/bin/pint --test` over the whole repo still reports the pre-existing `inspect_order.php` issues (B5, untracked stray — out of scope to modify). The new `CheckoutIdempotencyTest.php` initially failed `class_attributes_separation` (a double blank line); this was corrected in `88e1e22` and now **passes** `pint --test`. No committed tracked file fails Pint except via the untracked stray.
 
 **Still pending (unchanged, require out-of-scope resources):** B1 (VAPID), B2 (Google Maps keys), B3 (queue worker / hosting), B4 (k6 install + run). This pass did **not** deploy, select a host, install k6, or configure any live credentials.
+**9. Debug-file triage + final prioritized checklist**
+
+**9.1 Debug-file triage** (contents read only; no file deleted, modified, staged, or ignored)
+
+| File | Role | Needed? | Appearance | Safest handling |
+|---|---|---|---|---|
+| `inspect_order.php` | Standalone script that vendor/autoloads and dumps the first `Order`, its `Payment`, `Delivery`, sample payments. | **No** | Temp dev-debug tool. **Broken/stale**: `payments` has **no `amount` column**, yet prints `$payment->amount` (and `$order->items_total` *does* exist, `$payment->method/status` do too). Not used by the app or tests. | **Delete.** |
+| `dbg_synservice.ps1` | Read-only PowerShell inspector: CRLF/bytes, locates `SyncOutbox::create`. | **No** | Temp debug tool. | **Delete**. |
+| `dbg_synservice2.ps1` | Read-only PowerShell inspector: hexdump around `SyncOutbox::create`. | **No** | Temp debug tool. | **Delete**. |
+| `fix_synservice.ps1` | One-shot script that mutated `SyncService.php` (already applied; file now clean at line 79). | **No** | Temp, obsolete/mutating. | **Delete**. |
+| `fix_synservice2.ps1` | Same as above (byte-level pattern). | **No** | Temp, obsolete/mutating. | **Delete**. |
+| `.opencode/` | Editor tool runtime metadata/cache. | **No** | Tool artifact. | `.gitignore`+ (excluded). |
+| `storage/` | Laravel runtime cache/storage. | **No** | App runtime dir. | `.gitignore`/gitignored by default. |
+
+None are required by the app or test suite. All are dev/debug artifacts left in the working tree. Following audit rules, **no untracked file was deleted, modified, staged, or ignored** by this pass — deletion is an owner decision (see §9.3).
+
+**9.2 Why `inspect_order.php` fails the whole-repo `pint --test` gate — correctly distinguished:**
+
+- The failure is **pure code style in one untracked debug file** (`single_quote`, `fully_qualified_strict_types`, `concat_space`, `no_closing_tag`, `single_line_after_import`).
+- **No tracked/application code fails Pint.** Verified: `vendor/bin/pint --test app tests config database routes resources` → **192 files PASS (exit 0)**.
+- **Pint does not honor `.gitignore`.** Proven empirically: while `inspect_order.php` was in `.gitignore`, `pint --test` still flagged it. So gitignoring does **not** clear the gate — only deleting the file or scoping Pint (a `pint.json` with `notPath`/path exclusion) does.
+- No CI workflow exists at the repo root and there is no `pint.json`; this is currently a **manual** whole-repo check, not an enforced CI gate.
+**9.3 Owner decision** (not performed by this audit): delete or move out of the tree the **7 top-level git-status entries** — the two directory entries `.opencode/` and `storage/`, and the five file entries `dbg_synservice.ps1`, `dbg_synservice2.ps1`, `fix_synservice.ps1`, `fix_synservice2.ps1`, `inspect_order.php`. Because `inspect_order.php` trips the whole-repo Pint gate if CI ever runs `pint --test`, deletion is the recommended resolution. Note that `.gitignore` entries are insufficient on their own to fix the Pint gate (shown above). Nothing was, or will be, deleted, modified, staged, or ignored by this audit; deletion of any untracked file is an explicit owner decision, and the 19-file recursive inventory noted in §2 is *not* a directive to delete any of them.
+
+**9.4 Prioritized finalization checklist** (no deployment performed)
+
+*Tasks that can be completed locally with **no external credentials**, hosting, or tooling beyond the existing dev environment:*
+
+1. **Confirm whole-`pint --test` is green** on the cleaned tree (`vendor/bin/pint --test`), consistent with the 192-tracked-file pass already verified. (Item 3.)
+2. **Confirm the full PHPUnit suite stays green** on the cleaned tree (`php artisan test` → 156 passed / 596 assertions / 0 failures), re-running only the checkout, order-flow, and E2E suites that touch the idempotency feature.
+
+*Tasks requiring secrets, external services, or a hosting decision:*
+
+3. **B1 — Web Push VAPID** (VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT): owner supplies keypair via `php artisan webpush:vapid`; never commit. **Live PENDING** — no live push verified.
+4. **B2 — Google Maps** (GOOGLE_MAPS_BROWSER_KEY, GOOGLE_MAPS_SERVER_KEY): owner supplies referrer-restricted browser key + server-only key; server key must stay backend-only. **Live PENDING** — no live map/route/ETA verified.
+5. **B3 — Production queue worker**: owner provisions a persistent worker (`php artisan queue:work --queue=default --tries=3`) + supervisor; `AssignOrderJob` is `ShouldQueue` with `.env.example` setting `QUEUE_CONNECTION=database`. **Functional risk** if unrun at launch.
+6. **B4 — k6 load test** (requires owner approval to install): seed per `k6/README`, run `k6 run k6/load-test.js` against a **safe local/staging** env (never production), record `--summary-export`, evaluate 1–3s propagation / 7s cadence thresholds from real numbers. **NOT executed here** (k6 not installed).
